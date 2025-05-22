@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -211,20 +211,19 @@
             loop();
             
             const sections = document.querySelectorAll('.section');
+            const fireworksCanvas = document.getElementById('fireworks-canvas');
             let currentIndex = 0;
             let isScrolling = false;
             const scrollDelay = 800;
             
-            let touchStartY = 0;
-            let touchEndY = 0;
-            const touchThreshold = 50; // 触发切换的最小滑动距离
+            // 检测设备类型
+            const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
             
             // 更新显示状态
             function updateDisplay() {
                 sections.forEach((section, index) => {
                     if (index === currentIndex) {
                         section.classList.add('active');
-                        // 当第二部分激活时加载Canvas-nest
                         if(index === 1 && !document.getElementById('canvas-nest-script')) {
                             loadCanvasNest();
                         }
@@ -233,45 +232,7 @@
                     }
                 });
             }
-            
-            // 处理触摸开始事件
-            function handleTouchStart(e) {
-                touchStartY = e.touches[0].clientY;
-            }
-            
-            // 处理触摸结束事件
-            function handleTouchEnd(e) {
-                if (isScrolling) return;
-                
-                touchEndY = e.changedTouches[0].clientY;
-                const deltaY = touchEndY - touchStartY;
-                
-                if (Math.abs(deltaY) < touchThreshold) return; // 如果滑动距离太小，不触发切换
-                
-                isScrolling = true;
-                
-                if (deltaY < 0) { // 向上滑动
-                    if (currentIndex < sections.length - 1) {
-                        currentIndex++;
-                    }
-                } else { // 向下滑动
-                    if (currentIndex > 0) {
-                        currentIndex--;
-                    }
-                }
-                
-                updateDisplay();
-                
-                setTimeout(() => {
-                    isScrolling = false;
-                }, scrollDelay);
-            }
-            
-            // 阻止默认的触摸行为
-            function preventDefault(e) {
-                e.preventDefault();
-            }
-            
+
             // 处理滚轮事件
             function handleWheel(e) {
                 if (isScrolling) return;
@@ -296,17 +257,72 @@
                     isScrolling = false;
                 }, scrollDelay);
             }
-            
-            // 检测设备类型
-            const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-            
+
             if (isMobile) {
-                // 移动端：添加触摸事件监听
-                window.addEventListener('touchstart', handleTouchStart, { passive: false });
-                window.addEventListener('touchend', handleTouchEnd, { passive: false });
-                window.addEventListener('touchmove', preventDefault, { passive: false });
+                // 移动端：处理触摸事件
+                let touchStartY = 0;
+                let touchStartTime = 0;
+                let touchStartX = 0;
+                const touchThreshold = 50;
+
+                window.addEventListener('touchstart', function(e) {
+                    touchStartY = e.touches[0].clientY;
+                    touchStartX = e.touches[0].clientX;
+                    touchStartTime = Date.now();
+                }, { passive: true });
+
+                window.addEventListener('touchend', function(e) {
+                    if (isScrolling) return;
+                    
+                    const touchEndY = e.changedTouches[0].clientY;
+                    const touchEndX = e.changedTouches[0].clientX;
+                    const touchEndTime = Date.now();
+                    const touchDuration = touchEndTime - touchStartTime;
+                    
+                    // 计算水平和垂直移动距离
+                    const deltaY = touchEndY - touchStartY;
+                    const deltaX = touchEndX - touchStartX;
+                    const moveDistance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+                    
+                    // 如果是快速点击（短时间内移动距离小），触发烟花
+                    if (touchDuration < 200 && moveDistance < 10) {
+                        if (currentIndex === 0) { // 只在第一个页面触发烟花
+                            createFirework(touchEndX, touchEndY);
+                        }
+                        return;
+                    }
+                    
+                    // 如果是滑动（垂直移动距离大），切换页面
+                    if (Math.abs(deltaY) > touchThreshold && Math.abs(deltaY) > Math.abs(deltaX)) {
+                        isScrolling = true;
+                        
+                        if (deltaY < 0) { // 向上滑动
+                            if (currentIndex < sections.length - 1) {
+                                currentIndex++;
+                            }
+                        } else { // 向下滑动
+                            if (currentIndex > 0) {
+                                currentIndex--;
+                            }
+                        }
+                        
+                        updateDisplay();
+                        
+                        setTimeout(() => {
+                            isScrolling = false;
+                        }, scrollDelay);
+                    }
+                }, { passive: true });
+
             } else {
-                // 桌面端：添加滚轮事件监听
+                // 桌面端：点击触发烟花和滚轮切换
+                if (fireworksCanvas) {
+                    fireworksCanvas.addEventListener('click', function(e) {
+                        createFirework(e.clientX, e.clientY);
+                    });
+                }
+                
+                // 添加滚轮事件监听
                 window.addEventListener('wheel', handleWheel, { passive: false });
             }
             
